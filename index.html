@@ -1,0 +1,1733 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=no">
+<title>Calculadora — tudo em um só lugar</title>
+<style>
+  :root {
+    --bg: #0B0E14;
+    --panel: #12161D;
+    --panel-2: #171D27;
+    --btn: #1B222C;
+    --btn-hover: #232C39;
+    --btn-active: #2A3543;
+    --border: #232B36;
+    --text: #E6EDF3;
+    --text-dim: #7D8590;
+    --text-faint: #4B5361;
+    --accent: #45D6C4;
+    --accent-text: #072420;
+    --accent-dim: rgba(69, 214, 196, 0.14);
+    --amber: #F2B84B;
+    --amber-dim: rgba(242, 184, 75, 0.14);
+    --danger: #F2555A;
+    --danger-dim: rgba(242, 85, 90, 0.14);
+    --radius: 14px;
+    --font-mono: ui-monospace, "SFMono-Regular", "Cascadia Code", "Fira Code", Consolas, "Liberation Mono", monospace;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    display: flex;
+    justify-content: center;
+    padding: 18px 12px 32px;
+  }
+
+  .app { width: 100%; max-width: 440px; }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    padding: 0 2px;
+  }
+  header h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.2px; margin: 0; color: var(--text); }
+  header span { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); }
+
+  /* Mode tabs — scrollable strip */
+  .tabs {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 5px;
+    margin-bottom: 12px;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar { display: none; }
+
+  .tab {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: none;
+    background: transparent;
+    color: var(--text-dim);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 9px 13px;
+    border-radius: 9px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .tab.active { background: var(--accent-dim); color: var(--accent); }
+
+  /* Display (básica / científica) */
+  .display {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 16px 14px;
+    margin-bottom: 10px;
+    position: relative;
+    min-height: 108px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+  }
+  .display-badges {
+    position: absolute; top: 10px; left: 14px; right: 14px;
+    display: flex; justify-content: space-between;
+    font-family: var(--font-mono); font-size: 10px; color: var(--text-faint); letter-spacing: 0.5px;
+  }
+  .badge {
+    padding: 2px 6px; border-radius: 5px; background: var(--panel-2);
+    border: 1px solid var(--border); opacity: 0;
+    transition: opacity 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .badge.on { opacity: 1; color: var(--amber); border-color: rgba(242,184,75,0.35); }
+  .badge.static { opacity: 1; cursor: pointer; }
+  .badge.static.rad { color: var(--accent); border-color: rgba(69,214,196,0.35); }
+
+  .expr-line {
+    font-family: var(--font-mono); font-size: 14px; color: var(--text-dim);
+    text-align: right; min-height: 18px; word-break: break-all; white-space: pre-wrap; margin-top: 14px;
+  }
+  .result-line {
+    font-family: var(--font-mono); font-size: 34px; font-weight: 500;
+    text-align: right; color: var(--text); margin-top: 4px; word-break: break-all; line-height: 1.15;
+  }
+  .result-line.error { color: var(--danger); font-size: 22px; }
+  .preview-line {
+    font-family: var(--font-mono); font-size: 13px; text-align: right;
+    color: var(--text-faint); min-height: 16px; margin-top: 2px;
+  }
+
+  /* History */
+  .history-wrap { margin-bottom: 10px; }
+  .history-head { display: flex; justify-content: space-between; align-items: center; padding: 0 4px 6px; }
+  .history-head span { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); letter-spacing: 0.4px; }
+  .history-head button { background: none; border: none; color: var(--text-faint); font-size: 11px; font-family: var(--font-sans); cursor: pointer; padding: 2px 4px; }
+  .history-head button:hover { color: var(--danger); }
+  .history-list { display: flex; flex-direction: column; gap: 4px; max-height: 110px; overflow-y: auto; }
+  .history-item {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 9px; padding: 7px 10px;
+    cursor: pointer; display: flex; justify-content: space-between; gap: 8px; font-family: var(--font-mono);
+  }
+  .history-item:hover { background: var(--panel-2); }
+  .history-item .h-expr { font-size: 11px; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .history-item .h-res { font-size: 13px; color: var(--text-dim); flex-shrink: 0; }
+
+  /* Pill row (base tabs / categories / shapes) */
+  .pill-row {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px;
+  }
+  .pill-row.scrollx { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .pill-row.scrollx::-webkit-scrollbar { display: none; }
+  .pill {
+    flex: 0 0 auto;
+    border: 1px solid var(--border); background: var(--panel); color: var(--text-dim);
+    font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+    padding: 8px 12px; border-radius: 9px; cursor: pointer; white-space: nowrap;
+  }
+  .pill.active { background: var(--amber-dim); color: var(--amber); border-color: rgba(242,184,75,0.35); }
+  .pill.accentpill.active { background: var(--accent-dim); color: var(--accent); border-color: rgba(69,214,196,0.35); }
+
+  .base-panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 10px 14px; margin-bottom: 10px; font-family: var(--font-mono); font-size: 12px;
+  }
+  .base-row { display: flex; justify-content: space-between; padding: 3px 0; color: var(--text-faint); }
+  .base-row.current { color: var(--amber); }
+  .base-row .b-label { letter-spacing: 0.5px; }
+  .base-row .b-val { word-break: break-all; text-align: right; margin-left: 12px; }
+  .word-note { text-align: right; font-size: 10px; color: var(--text-faint); margin: -4px 2px 10px; font-family: var(--font-mono); }
+
+  /* Pads */
+  .pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .fn-pad { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 8px; }
+
+  button.key {
+    border: 1px solid var(--border); background: var(--btn); color: var(--text);
+    font-family: var(--font-mono); font-size: 17px; font-weight: 500;
+    padding: 15px 4px; border-radius: 11px; cursor: pointer;
+    transition: background 0.1s ease, transform 0.05s ease; user-select: none;
+  }
+  button.key:active { transform: scale(0.96); background: var(--btn-active); }
+  button.key.fn {
+    font-family: var(--font-sans); font-size: 13px; font-weight: 600; padding: 12px 4px;
+    color: var(--amber); background: var(--amber-dim); border-color: rgba(242,184,75,0.25);
+  }
+  button.key.op { color: var(--accent); background: var(--accent-dim); border-color: rgba(69,214,196,0.25); }
+  button.key.bitop {
+    font-family: var(--font-sans); font-size: 12px; font-weight: 700; color: var(--amber);
+    background: var(--amber-dim); border-color: rgba(242,184,75,0.25);
+  }
+  button.key.mem {
+    font-family: var(--font-sans); font-size: 12px; font-weight: 700; color: var(--text-dim);
+    background: var(--panel-2); padding: 10px 4px;
+  }
+  button.key.clear { color: var(--danger); background: var(--danger-dim); border-color: rgba(242,85,90,0.25); }
+  button.key.equals {
+    grid-column: span 4; background: var(--accent); color: var(--accent-text);
+    border: none; font-size: 19px; font-weight: 700; padding: 16px 4px;
+  }
+  button.key.equals:active { background: #38C2B1; }
+  button.key:disabled { opacity: 0.28; pointer-events: none; }
+
+  /* Generic tool-mode form styling (Função / Física / Conversor / Estatística / Geometria) */
+  .tool-panel {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px; margin-bottom: 10px;
+  }
+  .tool-panel + .tool-panel { margin-top: -2px; }
+  .field { margin-bottom: 10px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label {
+    display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 5px;
+    font-family: var(--font-sans); letter-spacing: 0.2px;
+  }
+  .field .unit-suffix { color: var(--text-faint); font-weight: 400; }
+  .field input[type=number], .field input[type=text], .field select {
+    width: 100%; background: var(--btn); border: 1px solid var(--border); color: var(--text);
+    font-family: var(--font-mono); font-size: 15px; padding: 10px 11px; border-radius: 9px;
+    -webkit-appearance: none; appearance: none;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--accent); }
+  .field-row { display: flex; gap: 8px; }
+  .field-row .field { flex: 1; }
+
+  .chip-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 2px; }
+  .chip {
+    font-family: var(--font-mono); font-size: 12px; background: var(--panel-2);
+    border: 1px solid var(--border); color: var(--text-dim); border-radius: 8px;
+    padding: 5px 6px 5px 10px; display: flex; align-items: center; gap: 6px;
+  }
+  .chip button {
+    border: none; background: none; color: var(--text-faint); cursor: pointer; font-size: 13px;
+    padding: 0 2px; line-height: 1;
+  }
+  .chip button:hover { color: var(--danger); }
+
+  .btn-primary {
+    width: 100%; background: var(--accent); color: var(--accent-text); border: none;
+    font-family: var(--font-sans); font-weight: 700; font-size: 14px; padding: 12px;
+    border-radius: 10px; cursor: pointer; margin-top: 2px;
+  }
+  .btn-primary:active { background: #38C2B1; }
+  .btn-secondary {
+    width: 100%; background: var(--panel-2); color: var(--text-dim); border: 1px solid var(--border);
+    font-family: var(--font-sans); font-weight: 600; font-size: 13px; padding: 10px;
+    border-radius: 10px; cursor: pointer; margin-top: 6px;
+  }
+
+  .insert-row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
+  .insert-chip {
+    font-family: var(--font-mono); font-size: 13px; background: var(--amber-dim); color: var(--amber);
+    border: 1px solid rgba(242,184,75,0.25); border-radius: 8px; padding: 6px 10px; cursor: pointer;
+  }
+
+  .formula-list { display: flex; flex-direction: column; gap: 6px; }
+  .formula-btn {
+    text-align: left; background: var(--btn); border: 1px solid var(--border); color: var(--text);
+    border-radius: 10px; padding: 10px 12px; cursor: pointer; font-family: var(--font-sans);
+  }
+  .formula-btn.active { border-color: rgba(69,214,196,0.4); background: var(--accent-dim); }
+  .formula-btn .fname { font-size: 13px; font-weight: 600; display: block; }
+  .formula-btn .fformula { font-size: 11px; color: var(--text-faint); font-family: var(--font-mono); display: block; margin-top: 2px; }
+  .formula-btn.active .fformula { color: var(--accent); }
+
+  .result-box {
+    background: var(--accent-dim); border: 1px solid rgba(69,214,196,0.3); border-radius: 11px;
+    padding: 14px; margin-top: 10px; text-align: right;
+  }
+  .result-box .r-label { font-size: 11px; color: var(--text-dim); font-family: var(--font-sans); }
+  .result-box .r-value { font-size: 26px; font-weight: 600; color: var(--accent); font-family: var(--font-mono); word-break: break-all; }
+  .result-box.err { background: var(--danger-dim); border-color: rgba(242,85,90,0.3); }
+  .result-box.err .r-value { color: var(--danger); font-size: 15px; font-weight: 500; }
+
+  .stats-grid { display: flex; flex-direction: column; gap: 0; margin-top: 8px; }
+  .stats-grid .s-row {
+    display: flex; justify-content: space-between; padding: 7px 2px; border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono); font-size: 13px;
+  }
+  .stats-grid .s-row:last-child { border-bottom: none; }
+  .stats-grid .s-row span:first-child { color: var(--text-dim); font-family: var(--font-sans); font-size: 12px; }
+  .stats-grid .s-section {
+    font-family: var(--font-sans); font-size: 11px; color: var(--text-faint); letter-spacing: 0.4px;
+    margin: 10px 0 2px; padding-top: 4px;
+  }
+
+  .graph-wrap {
+    background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 8px; margin-bottom: 10px;
+  }
+  .graph-wrap svg { width: 100%; height: auto; display: block; }
+
+  .table-wrap { max-height: 160px; overflow-y: auto; margin-top: 8px; }
+  table.vtable { width: 100%; border-collapse: collapse; font-family: var(--font-mono); font-size: 12px; }
+  table.vtable th { text-align: right; color: var(--text-faint); font-weight: 500; font-size: 10px; padding: 4px 6px; }
+  table.vtable td { text-align: right; color: var(--text-dim); padding: 4px 6px; border-top: 1px solid var(--border); }
+  table.vtable td.calc { text-align: left; white-space: normal; color: var(--text); }
+
+  .note { font-size: 11px; color: var(--text-faint); font-family: var(--font-sans); margin-top: 8px; line-height: 1.4; }
+  .subtitle { font-size: 12px; color: var(--text-faint); font-family: var(--font-sans); margin: -2px 0 10px 2px; }
+
+  .hidden { display: none !important; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>Calculadora</h1>
+    <span id="modeLabel">básica</span>
+  </header>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-mode="basic">Básica</button>
+    <button class="tab" data-mode="scientific">Científica</button>
+    <button class="tab" data-mode="programmer">Programador</button>
+    <button class="tab" data-mode="function">Função</button>
+    <button class="tab" data-mode="physics">Física</button>
+    <button class="tab" data-mode="converter">Conversor</button>
+    <button class="tab" data-mode="stats">Estatística</button>
+    <button class="tab" data-mode="geometry">Geometria</button>
+  </div>
+
+  <!-- ================= BÁSICA / CIENTÍFICA ================= -->
+  <div class="display" id="mainDisplay">
+    <div class="display-badges">
+      <span class="badge" id="memBadge">M</span>
+      <span class="badge static" id="angleBadge">DEG</span>
+    </div>
+    <div class="expr-line" id="exprLine">&nbsp;</div>
+    <div class="preview-line" id="previewLine">&nbsp;</div>
+    <div class="result-line" id="resultLine">0</div>
+  </div>
+
+  <div class="history-wrap" id="historyWrap">
+    <div class="history-head">
+      <span>HISTÓRICO</span>
+      <button id="clearHistory">limpar</button>
+    </div>
+    <div class="history-list" id="historyList"></div>
+  </div>
+
+  <div class="fn-pad hidden" id="fnPad">
+    <button class="key fn" data-insert="sin(">sin</button>
+    <button class="key fn" data-insert="cos(">cos</button>
+    <button class="key fn" data-insert="tan(">tan</button>
+    <button class="key fn" id="angleToggle">DEG</button>
+    <button class="key fn" data-insert="asin(">asin</button>
+    <button class="key fn" data-insert="acos(">acos</button>
+    <button class="key fn" data-insert="atan(">atan</button>
+    <button class="key fn" data-insert="^">xʸ</button>
+    <button class="key fn" data-insert="sqrt(">√</button>
+    <button class="key fn" data-insert="log(">log</button>
+    <button class="key fn" data-insert="ln(">ln</button>
+    <button class="key fn" data-insert="!">n!</button>
+    <button class="key fn" data-insert="pi">π</button>
+    <button class="key fn" data-insert="e">e</button>
+    <button class="key fn" data-insert="(">(</button>
+    <button class="key fn" data-insert=")">)</button>
+  </div>
+
+  <div class="pad" id="basicPad">
+    <button class="key mem" data-mem="mc">MC</button>
+    <button class="key mem" data-mem="mr">MR</button>
+    <button class="key mem" data-mem="m+">M+</button>
+    <button class="key mem" data-mem="m-">M−</button>
+
+    <button class="key clear" data-action="clear">C</button>
+    <button class="key" data-action="back">⌫</button>
+    <button class="key op" data-insert="(">(</button>
+    <button class="key op" data-insert=")">)</button>
+
+    <button class="key" data-insert="7">7</button>
+    <button class="key" data-insert="8">8</button>
+    <button class="key" data-insert="9">9</button>
+    <button class="key op" data-insert="/">÷</button>
+
+    <button class="key" data-insert="4">4</button>
+    <button class="key" data-insert="5">5</button>
+    <button class="key" data-insert="6">6</button>
+    <button class="key op" data-insert="*">×</button>
+
+    <button class="key" data-insert="1">1</button>
+    <button class="key" data-insert="2">2</button>
+    <button class="key" data-insert="3">3</button>
+    <button class="key op" data-insert="-">−</button>
+
+    <button class="key" data-action="sign">±</button>
+    <button class="key" data-insert="0">0</button>
+    <button class="key" data-insert=".">.</button>
+    <button class="key op" data-insert="+">+</button>
+
+    <button class="key" data-insert="%">%</button>
+    <button class="key equals" data-action="equals" style="grid-column: span 3;">=</button>
+  </div>
+
+  <!-- ================= PROGRAMADOR ================= -->
+  <div class="hidden" id="progWrap">
+    <div class="pill-row">
+      <button class="pill accentpill" data-base="16">HEX</button>
+      <button class="pill accentpill active" data-base="10">DEC</button>
+      <button class="pill accentpill" data-base="8">OCT</button>
+      <button class="pill accentpill" data-base="2">BIN</button>
+    </div>
+    <div class="base-panel">
+      <div class="base-row" data-baserow="16"><span class="b-label">HEX</span><span class="b-val" id="valHex">0</span></div>
+      <div class="base-row current" data-baserow="10"><span class="b-label">DEC</span><span class="b-val" id="valDec">0</span></div>
+      <div class="base-row" data-baserow="8"><span class="b-label">OCT</span><span class="b-val" id="valOct">0</span></div>
+      <div class="base-row" data-baserow="2"><span class="b-label">BIN</span><span class="b-val" id="valBin">0</span></div>
+    </div>
+    <div class="word-note">32 bits, sem sinal</div>
+
+    <div class="pad" id="progPad">
+      <button class="key" data-pdigit="13">D</button>
+      <button class="key" data-pdigit="14">E</button>
+      <button class="key" data-pdigit="15">F</button>
+      <button class="key op" data-pop="/">÷</button>
+
+      <button class="key" data-pdigit="10">A</button>
+      <button class="key" data-pdigit="11">B</button>
+      <button class="key" data-pdigit="12">C</button>
+      <button class="key op" data-pop="*">×</button>
+
+      <button class="key" data-pdigit="7">7</button>
+      <button class="key" data-pdigit="8">8</button>
+      <button class="key" data-pdigit="9">9</button>
+      <button class="key op" data-pop="-">−</button>
+
+      <button class="key" data-pdigit="4">4</button>
+      <button class="key" data-pdigit="5">5</button>
+      <button class="key" data-pdigit="6">6</button>
+      <button class="key op" data-pop="+">+</button>
+
+      <button class="key" data-pdigit="1">1</button>
+      <button class="key" data-pdigit="2">2</button>
+      <button class="key" data-pdigit="3">3</button>
+      <button class="key bitop" data-pop="AND">AND</button>
+
+      <button class="key bitop" data-paction="not">NOT</button>
+      <button class="key" data-pdigit="0">0</button>
+      <button class="key bitop" data-pop="OR">OR</button>
+      <button class="key bitop" data-pop="XOR">XOR</button>
+
+      <button class="key bitop" data-pop="LSH">LSH</button>
+      <button class="key bitop" data-pop="RSH">RSH</button>
+      <button class="key clear" data-paction="clear">AC</button>
+      <button class="key" data-paction="back">⌫</button>
+
+      <button class="key equals" data-paction="equals">=</button>
+    </div>
+  </div>
+
+  <!-- ================= FUNÇÃO ================= -->
+  <div class="hidden" id="funcWrap">
+    <div class="pill-row">
+      <button class="pill accentpill active" data-fsub="generic">Genérica</button>
+      <button class="pill accentpill" data-fsub="quadratic">Quadrática</button>
+    </div>
+
+    <!-- Genérica -->
+    <div id="funcGeneric">
+      <div class="tool-panel">
+        <div class="field">
+          <label>f(x) =</label>
+          <input type="text" id="fxInput" placeholder="x^2 - 4x + 3" autocomplete="off">
+        </div>
+        <div class="insert-row">
+          <button class="insert-chip" data-fxins="x">x</button>
+          <button class="insert-chip" data-fxins="^">^</button>
+          <button class="insert-chip" data-fxins="sqrt(">√</button>
+          <button class="insert-chip" data-fxins="sin(">sin</button>
+          <button class="insert-chip" data-fxins="cos(">cos</button>
+          <button class="insert-chip" data-fxins="tan(">tan</button>
+          <button class="insert-chip" data-fxins="log(">log</button>
+          <button class="insert-chip" data-fxins="ln(">ln</button>
+          <button class="insert-chip" data-fxins="pi">π</button>
+          <button class="insert-chip" data-fxins="(">(</button>
+          <button class="insert-chip" data-fxins=")">)</button>
+        </div>
+        <div class="field-row">
+          <div class="field"><label>avaliar em x =</label><input type="number" id="fxEvalAt" placeholder="0" value="0"></div>
+        </div>
+        <div class="result-box" id="fxEvalResult"><div class="r-label">f(x)</div><div class="r-value">—</div></div>
+      </div>
+
+      <div class="tool-panel">
+        <div class="field-row">
+          <div class="field"><label>x mínimo</label><input type="number" id="fxMin" value="-4"></div>
+          <div class="field"><label>x máximo</label><input type="number" id="fxMax" value="5"></div>
+          <div class="field" style="flex:0.6"><label>passo</label><input type="number" id="fxStep" value="1" min="0.0001" step="0.5"></div>
+        </div>
+        <button class="btn-primary" id="fxPlotBtn">Gerar gráfico e tabela</button>
+      </div>
+
+      <div class="graph-wrap hidden" id="fxGraphWrap">
+        <svg id="fxGraph" viewBox="0 0 400 260"></svg>
+      </div>
+      <div class="tool-panel hidden" id="fxTableWrap">
+        <div class="subtitle">Tabela de valores</div>
+        <div class="table-wrap"><table class="vtable" id="fxTable"></table></div>
+      </div>
+    </div>
+
+    <!-- Quadrática -->
+    <div class="hidden" id="funcQuadratic">
+      <div class="tool-panel">
+        <div class="subtitle">ax² + bx + c = 0</div>
+        <div class="field-row">
+          <div class="field"><label>a</label><input type="number" id="qa" placeholder="1" value="1"></div>
+          <div class="field"><label>b</label><input type="number" id="qb" placeholder="-5" value="-5"></div>
+          <div class="field"><label>c</label><input type="number" id="qc" placeholder="6" value="6"></div>
+        </div>
+        <button class="btn-primary" id="qSolveBtn">Resolver</button>
+      </div>
+      <div class="tool-panel hidden" id="qResultWrap">
+        <div class="stats-grid" id="qResultGrid"></div>
+      </div>
+      <div class="graph-wrap hidden" id="qGraphWrap">
+        <svg id="qGraph" viewBox="0 0 400 260"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= FÍSICA ================= -->
+  <div class="hidden" id="physWrap">
+    <div class="pill-row scrollx" id="physCats"></div>
+    <div class="formula-list" id="physFormulas"></div>
+    <div class="tool-panel hidden" id="physFormPanel">
+      <div class="subtitle" id="physFormulaLabel"></div>
+      <div id="physFields"></div>
+      <button class="btn-primary" id="physCalcBtn">Calcular</button>
+      <div class="result-box hidden" id="physResult"><div class="r-label"></div><div class="r-value"></div></div>
+    </div>
+  </div>
+
+  <!-- ================= CONVERSOR ================= -->
+  <div class="hidden" id="convWrap">
+    <div class="pill-row scrollx" id="convCats"></div>
+    <div class="tool-panel">
+      <div class="field">
+        <label>Valor</label>
+        <input type="number" id="convValue" value="1">
+      </div>
+      <div class="field-row">
+        <div class="field"><label>De</label><select id="convFrom"></select></div>
+        <div class="field"><label>Para</label><select id="convTo"></select></div>
+      </div>
+      <button class="btn-secondary" id="convSwap">↕ inverter</button>
+      <div class="result-box" id="convResult"><div class="r-label">Resultado</div><div class="r-value">—</div></div>
+    </div>
+  </div>
+
+  <!-- ================= ESTATÍSTICA ================= -->
+  <div class="hidden" id="statsWrap">
+    <div class="tool-panel">
+      <div class="field-row">
+        <div class="field" style="flex:2"><label>Adicionar valor</label><input type="number" id="statInput" placeholder="ex: 8,5"></div>
+      </div>
+      <button class="btn-primary" id="statAddBtn">Adicionar</button>
+      <div class="chip-row" id="statChips"></div>
+      <button class="btn-secondary hidden" id="statClearBtn">limpar tudo</button>
+    </div>
+    <div class="tool-panel hidden" id="statResultWrap">
+      <div class="stats-grid" id="statResultGrid"></div>
+    </div>
+  </div>
+
+  <!-- ================= GEOMETRIA ================= -->
+  <div class="hidden" id="geoWrap">
+    <div class="pill-row scrollx" id="geoShapes"></div>
+    <div class="tool-panel">
+      <div id="geoFields"></div>
+      <button class="btn-primary" id="geoCalcBtn">Calcular</button>
+    </div>
+    <div class="tool-panel hidden" id="geoResultWrap">
+      <div class="stats-grid" id="geoResultGrid"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ===========================================================
+     EXPRESSION EVALUATOR (compartilhado: básica/científica/função)
+  =========================================================== */
+  const CONSTANTS = { pi: Math.PI, e: Math.E };
+  const FUNCS = {
+    sin: (x, deg) => Math.sin(deg ? x * Math.PI / 180 : x),
+    cos: (x, deg) => Math.cos(deg ? x * Math.PI / 180 : x),
+    tan: (x, deg) => Math.tan(deg ? x * Math.PI / 180 : x),
+    asin: (x, deg) => { const r = Math.asin(x); return deg ? r * 180 / Math.PI : r; },
+    acos: (x, deg) => { const r = Math.acos(x); return deg ? r * 180 / Math.PI : r; },
+    atan: (x, deg) => { const r = Math.atan(x); return deg ? r * 180 / Math.PI : r; },
+    sqrt: (x) => Math.sqrt(x),
+    cbrt: (x) => Math.cbrt(x),
+    log: (x) => Math.log10(x),
+    ln: (x) => Math.log(x),
+    abs: (x) => Math.abs(x),
+    exp: (x) => Math.exp(x),
+  };
+
+  function factorial(n) {
+    if (!Number.isFinite(n) || n < 0 || Math.abs(n - Math.round(n)) > 1e-9) return NaN;
+    n = Math.round(n);
+    if (n > 170) return Infinity;
+    let r = 1;
+    for (let i = 2; i <= n; i++) r *= i;
+    return r;
+  }
+
+  function tokenize(expr) {
+    const tokens = [];
+    let i = 0;
+    while (i < expr.length) {
+      const ch = expr[i];
+      if (/\s/.test(ch)) { i++; continue; }
+      if (/[0-9.]/.test(ch)) {
+        let num = "";
+        while (i < expr.length && /[0-9.]/.test(expr[i])) { num += expr[i]; i++; }
+        tokens.push({ type: "num", value: parseFloat(num) });
+        continue;
+      }
+      if (/[a-zA-Z]/.test(ch)) {
+        let name = "";
+        while (i < expr.length && /[a-zA-Z]/.test(expr[i])) { name += expr[i]; i++; }
+        tokens.push({ type: "ident", value: name });
+        continue;
+      }
+      if ("+-*/^%()!".includes(ch)) {
+        tokens.push({ type: "op", value: ch });
+        i++;
+        continue;
+      }
+      throw new Error("Caractere inválido: " + ch);
+    }
+    return tokens;
+  }
+
+  class Parser {
+    constructor(tokens, angleMode, vars) {
+      this.tokens = tokens;
+      this.pos = 0;
+      this.deg = angleMode === "deg";
+      this.vars = vars || {};
+    }
+    peek() { return this.tokens[this.pos]; }
+    consume() { return this.tokens[this.pos++]; }
+    expectOp(op) {
+      const t = this.consume();
+      if (!t || t.type !== "op" || t.value !== op) throw new Error('Esperado "' + op + '"');
+    }
+    parseExpr() {
+      let val = this.parseTerm();
+      while (this.peek() && this.peek().type === "op" && (this.peek().value === "+" || this.peek().value === "-")) {
+        const op = this.consume().value;
+        const rhs = this.parseTerm();
+        val = op === "+" ? val + rhs : val - rhs;
+      }
+      return val;
+    }
+    parseTerm() {
+      let val = this.parseUnary();
+      for (;;) {
+        const t = this.peek();
+        if (!t) break;
+        if (t.type === "op" && (t.value === "*" || t.value === "/")) {
+          const op = this.consume().value;
+          const rhs = this.parseUnary();
+          val = op === "*" ? val * rhs : val / rhs;
+          continue;
+        }
+        if (t.type === "num" || t.type === "ident" || (t.type === "op" && t.value === "(")) {
+          const rhs = this.parseUnary();
+          val = val * rhs;
+          continue;
+        }
+        break;
+      }
+      return val;
+    }
+    parseUnary() {
+      if (this.peek() && this.peek().type === "op" && this.peek().value === "-") { this.consume(); return -this.parseUnary(); }
+      if (this.peek() && this.peek().type === "op" && this.peek().value === "+") { this.consume(); return this.parseUnary(); }
+      return this.parsePower();
+    }
+    parsePower() {
+      let base = this.parsePostfix();
+      if (this.peek() && this.peek().type === "op" && this.peek().value === "^") {
+        this.consume();
+        const exp = this.parseUnary();
+        base = Math.pow(base, exp);
+      }
+      return base;
+    }
+    parsePostfix() {
+      let val = this.parsePrimary();
+      for (;;) {
+        if (this.peek() && this.peek().type === "op" && this.peek().value === "!") { this.consume(); val = factorial(val); continue; }
+        if (this.peek() && this.peek().type === "op" && this.peek().value === "%") { this.consume(); val = val / 100; continue; }
+        break;
+      }
+      return val;
+    }
+    parsePrimary() {
+      const t = this.peek();
+      if (!t) throw new Error("Expressão incompleta");
+      if (t.type === "num") { this.consume(); return t.value; }
+      if (t.type === "ident") {
+        const name = t.value.toLowerCase();
+        const next = this.tokens[this.pos + 1];
+        if (next && next.type === "op" && next.value === "(") {
+          this.consume(); this.consume();
+          const arg = this.parseExpr();
+          this.expectOp(")");
+          if (!FUNCS[name]) throw new Error("Função desconhecida: " + name);
+          return FUNCS[name](arg, this.deg);
+        }
+        if (this.vars.hasOwnProperty(name)) { this.consume(); return this.vars[name]; }
+        if (CONSTANTS.hasOwnProperty(name)) { this.consume(); return CONSTANTS[name]; }
+        throw new Error("Identificador desconhecido: " + name);
+      }
+      if (t.type === "op" && t.value === "(") {
+        this.consume();
+        const val = this.parseExpr();
+        this.expectOp(")");
+        return val;
+      }
+      throw new Error("Token inesperado");
+    }
+  }
+
+  function evaluate(expr, angleMode, vars) {
+    const tokens = tokenize(expr);
+    const p = new Parser(tokens, angleMode, vars);
+    const val = p.parseExpr();
+    if (p.pos !== tokens.length) throw new Error("Expressão mal formada");
+    if (typeof val !== "number" || Number.isNaN(val)) throw new Error("Resultado inválido");
+    return val;
+  }
+
+  function formatNumber(n) {
+    if (!Number.isFinite(n)) return n === Infinity ? "∞" : (n === -Infinity ? "-∞" : "Erro");
+    if (Object.is(n, -0)) n = 0;
+    const abs = Math.abs(n);
+    if (abs !== 0 && (abs >= 1e15 || abs < 1e-9)) return n.toExponential(6).replace(/e\+?/, "e");
+    if (Number.isInteger(n)) return n.toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    let s = n.toFixed(10);
+    s = s.replace(/0+$/, "").replace(/\.$/, "");
+    const parts = s.split(".");
+    parts[0] = Number(parts[0]).toLocaleString("pt-BR", { maximumFractionDigits: 0 });
+    return parts.join(",");
+  }
+
+  // number formatter for tool-mode result boxes (fewer decimals, still pt-BR)
+  function fmt(n, digits) {
+    if (typeof digits === "undefined") digits = 6;
+    if (!Number.isFinite(n)) return n === Infinity ? "∞" : (n === -Infinity ? "-∞" : "Erro");
+    if (Object.is(n, -0)) n = 0;
+    const abs = Math.abs(n);
+    if (abs !== 0 && (abs >= 1e12 || abs < 1e-6)) return n.toExponential(4).replace(/e\+?/, "e").replace(".", ",");
+    let s = n.toFixed(digits).replace(/0+$/, "").replace(/\.$/, "");
+    return s.replace(".", ",");
+  }
+
+  function parseLocaleNumber(v) {
+    if (typeof v === "number") return v;
+    const n = parseFloat(String(v).replace(",", "."));
+    return n;
+  }
+
+  // "estilo caderno": mostra a substituição de x pelo valor, tipo f(-1) = (-1)²-4(-1)
+  const SUPERS = { "0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","-":"⁻" };
+  function toSuperscript(str) {
+    let out = "";
+    for (const ch of str) { if (SUPERS[ch] === undefined) return null; out += SUPERS[ch]; }
+    return out;
+  }
+  function substituteDisplay(exprRaw, xval) {
+    const xStr = fmt(xval, 6);
+    let s = exprRaw.replace(/(?<![a-zA-Z])x(?![a-zA-Z])/g, "(" + xStr + ")");
+    s = s.replace(/\^(-?\d+)/g, (m, exp) => { const sup = toSuperscript(exp); return sup ? sup : m; });
+    s = s.replace(/\*/g, "·");
+    return s;
+  }
+
+  /* ===========================================================
+     BÁSICA / CIENTÍFICA — estado e handlers
+  =========================================================== */
+  let expr = "";
+  let angleMode = "deg";
+  let memory = 0;
+  let history = [];
+
+  const exprLine = document.getElementById("exprLine");
+  const previewLine = document.getElementById("previewLine");
+  const resultLine = document.getElementById("resultLine");
+  const memBadge = document.getElementById("memBadge");
+  const angleBadge = document.getElementById("angleBadge");
+  const angleToggle = document.getElementById("angleToggle");
+  const historyList = document.getElementById("historyList");
+
+  const DISPLAY_MAP = { "*": "×", "/": "÷", "-": "−" };
+  function prettyExpr(s) { return s.replace(/[*/\-]/g, (m) => DISPLAY_MAP[m] || m); }
+
+  function renderCalc() {
+    exprLine.textContent = expr ? prettyExpr(expr) : "\u00A0";
+    memBadge.classList.toggle("on", memory !== 0);
+    angleBadge.textContent = angleMode === "deg" ? "DEG" : "RAD";
+    angleBadge.classList.toggle("rad", angleMode === "rad");
+    if (angleToggle) angleToggle.textContent = angleMode === "deg" ? "DEG" : "RAD";
+
+    if (!expr) {
+      resultLine.textContent = "0";
+      resultLine.classList.remove("error");
+      previewLine.textContent = "\u00A0";
+      return;
+    }
+    try {
+      const val = evaluate(expr, angleMode);
+      previewLine.textContent = "= " + formatNumber(val);
+    } catch (e) {
+      previewLine.textContent = "\u00A0";
+    }
+  }
+
+  function renderHistory() {
+    historyList.innerHTML = "";
+    history.slice(0, 8).forEach((h) => {
+      const row = document.createElement("div");
+      row.className = "history-item";
+      row.innerHTML = '<span class="h-expr">' + prettyExpr(h.expr) + '</span><span class="h-res">' + h.result + "</span>";
+      row.addEventListener("click", () => { expr = h.result.replace(/\./g, "").replace(",", "."); renderCalc(); });
+      historyList.appendChild(row);
+    });
+    document.getElementById("historyWrap").classList.toggle("hidden", history.length === 0);
+  }
+
+  function calcInsert(token) {
+    if (token === ".") {
+      const seg = expr.split(/[^0-9.]/).pop();
+      if (seg.includes(".")) return;
+      if (seg === "") token = "0.";
+    }
+    expr += token;
+    renderCalc();
+  }
+
+  function calcAction(action) {
+    if (action === "clear") { expr = ""; renderCalc(); return; }
+    if (action === "back") { expr = expr.slice(0, -1); renderCalc(); return; }
+    if (action === "sign") {
+      const m = expr.match(/(\d+\.?\d*)$/);
+      if (!m) { expr += "-"; renderCalc(); return; }
+      const num = m[1];
+      const start = expr.length - num.length;
+      const before = expr.slice(0, start);
+      if (before.endsWith("(-")) {
+        expr = before.slice(0, -2) + num + expr.slice(expr.length);
+      } else if (before.endsWith("-") && !/[+\-*/^(]$/.test(before.slice(0, -1))) {
+        expr = before.slice(0, -1) + num;
+      } else {
+        expr = before + "(-" + num + ")";
+      }
+      renderCalc();
+      return;
+    }
+    if (action === "equals") {
+      if (!expr) return;
+      try {
+        const val = evaluate(expr, angleMode);
+        const resStr = formatNumber(val);
+        history.unshift({ expr: expr, result: resStr });
+        history = history.slice(0, 8);
+        renderHistory();
+        resultLine.textContent = resStr;
+        resultLine.classList.remove("error");
+        expr = String(val);
+        previewLine.textContent = "\u00A0";
+        exprLine.textContent = "\u00A0";
+      } catch (e) {
+        resultLine.textContent = "Erro";
+        resultLine.classList.add("error");
+      }
+    }
+  }
+
+  function calcMem(op) {
+    let current = 0;
+    try { current = expr ? evaluate(expr, angleMode) : parseFloat(resultLine.textContent.replace(/\./g, "").replace(",", ".")) || 0; } catch (e) { current = 0; }
+    if (op === "mc") memory = 0;
+    if (op === "mr") { expr += String(memory); renderCalc(); }
+    if (op === "m+") memory += current;
+    if (op === "m-") memory -= current;
+    renderCalc();
+  }
+
+  document.getElementById("basicPad").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    if (btn.dataset.insert !== undefined) calcInsert(btn.dataset.insert);
+    else if (btn.dataset.action) calcAction(btn.dataset.action);
+    else if (btn.dataset.mem) calcMem(btn.dataset.mem);
+  });
+
+  document.getElementById("fnPad").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn) return;
+    if (btn.id === "angleToggle") { angleMode = angleMode === "deg" ? "rad" : "deg"; renderCalc(); return; }
+    if (btn.dataset.insert !== undefined) calcInsert(btn.dataset.insert);
+  });
+
+  angleBadge.addEventListener("click", () => { angleMode = angleMode === "deg" ? "rad" : "deg"; renderCalc(); });
+  document.getElementById("clearHistory").addEventListener("click", () => { history = []; renderHistory(); });
+
+  /* ===========================================================
+     PROGRAMADOR
+  =========================================================== */
+  const MASK = (1n << 32n) - 1n;
+  const mask = (x) => x & MASK;
+
+  let base = 10;
+  let entry = "";
+  let acc = null;
+  let pendingOp = null;
+
+  const valHex = document.getElementById("valHex");
+  const valDec = document.getElementById("valDec");
+  const valOct = document.getElementById("valOct");
+  const valBin = document.getElementById("valBin");
+
+  function maxLenForBase(b) { return b === 16 ? 8 : b === 10 ? 10 : b === 8 ? 11 : 32; }
+
+  function currentValue() {
+    if (entry !== "") return mask(BigInt(parseInt(entry, base) || 0));
+    return acc !== null ? acc : 0n;
+  }
+
+  function computeBit(a, op, b) {
+    switch (op) {
+      case "+": return mask(a + b);
+      case "-": return mask(a - b);
+      case "*": return mask(a * b);
+      case "/": return b === 0n ? null : mask(a / b);
+      case "AND": return mask(a & b);
+      case "OR": return mask(a | b);
+      case "XOR": return mask(a ^ b);
+      case "LSH": return mask(a << (b & 63n));
+      case "RSH": return mask(a >> (b & 63n));
+      default: return a;
+    }
+  }
+
+  function renderProg() {
+    const v = currentValue();
+    valHex.textContent = v.toString(16).toUpperCase();
+    valDec.textContent = v.toString(10);
+    valOct.textContent = v.toString(8);
+    valBin.textContent = v.toString(2);
+
+    document.querySelectorAll(".base-row").forEach((row) => {
+      row.classList.toggle("current", Number(row.dataset.baserow) === base);
+    });
+
+    resultLine.textContent = entry !== "" ? entry : v.toString(base).toUpperCase();
+    resultLine.classList.remove("error");
+    exprLine.textContent = pendingOp ? (acc !== null ? acc.toString(base).toUpperCase() : "") + " " + pendingOp + "\u00A0" : "\u00A0";
+    previewLine.textContent = "\u00A0";
+
+    document.querySelectorAll("[data-pdigit]").forEach((btn) => {
+      const d = Number(btn.dataset.pdigit);
+      btn.disabled = d >= base;
+    });
+  }
+
+  function progDigit(d) {
+    if (d >= base) return;
+    if (entry.length >= maxLenForBase(base)) return;
+    entry += d.toString(16).toUpperCase();
+    renderProg();
+  }
+
+  function progOp(op) {
+    const cur = currentValue();
+    if (acc === null) { acc = cur; }
+    else if (pendingOp) { const r = computeBit(acc, pendingOp, cur); acc = r === null ? 0n : r; }
+    pendingOp = op;
+    entry = "";
+    renderProg();
+  }
+
+  function progAction(action) {
+    if (action === "clear") { entry = ""; acc = null; pendingOp = null; renderProg(); return; }
+    if (action === "back") { entry = entry.slice(0, -1); renderProg(); return; }
+    if (action === "not") { entry = mask(~currentValue()).toString(base).toUpperCase(); renderProg(); return; }
+    if (action === "equals") {
+      const cur = currentValue();
+      if (pendingOp && acc !== null) { const r = computeBit(acc, pendingOp, cur); acc = r === null ? 0n : r; }
+      else { acc = cur; }
+      pendingOp = null;
+      entry = acc.toString(base).toUpperCase();
+      renderProg();
+    }
+  }
+
+  document.getElementById("progPad").addEventListener("click", (e) => {
+    const btn = e.target.closest("button");
+    if (!btn || btn.disabled) return;
+    if (btn.dataset.pdigit !== undefined) progDigit(Number(btn.dataset.pdigit));
+    else if (btn.dataset.pop) progOp(btn.dataset.pop);
+    else if (btn.dataset.paction) progAction(btn.dataset.paction);
+  });
+
+  document.querySelectorAll("#progWrap .pill[data-base]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const newBase = Number(tab.dataset.base);
+      const v = currentValue();
+      base = newBase;
+      entry = v.toString(base).toUpperCase();
+      document.querySelectorAll("#progWrap .pill[data-base]").forEach((t) => t.classList.toggle("active", t === tab));
+      renderProg();
+    });
+  });
+
+  /* ===========================================================
+     FUNÇÃO — genérica + quadrática
+  =========================================================== */
+  function makeSvg(pointsList, opts) {
+    // pointsList: array of {points:[{x,y}...], color, dashed} — points may include null y to break the line
+    // opts: {xmin,xmax,ymin,ymax,markers:[{x,y,label,color}]}
+    const W = 400, H = 260, PAD = 30;
+    const xmin = opts.xmin, xmax = opts.xmax, ymin = opts.ymin, ymax = opts.ymax;
+    const sx = (x) => PAD + ((x - xmin) / (xmax - xmin)) * (W - 2 * PAD);
+    const sy = (y) => H - PAD - ((y - ymin) / (ymax - ymin)) * (H - 2 * PAD);
+
+    let svg = "";
+    // gridlines
+    svg += '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="none"/>';
+    const gridColor = "#232B36";
+    for (let i = 0; i <= 4; i++) {
+      const gx = PAD + (i / 4) * (W - 2 * PAD);
+      const gy = PAD + (i / 4) * (H - 2 * PAD);
+      svg += '<line x1="' + gx + '" y1="' + PAD + '" x2="' + gx + '" y2="' + (H - PAD) + '" stroke="' + gridColor + '" stroke-width="1"/>';
+      svg += '<line x1="' + PAD + '" y1="' + gy + '" x2="' + (W - PAD) + '" y2="' + gy + '" stroke="' + gridColor + '" stroke-width="1"/>';
+    }
+    // axes (x=0 / y=0) if within range
+    if (xmin <= 0 && xmax >= 0) {
+      const x0 = sx(0);
+      svg += '<line x1="' + x0 + '" y1="' + PAD + '" x2="' + x0 + '" y2="' + (H - PAD) + '" stroke="#4B5361" stroke-width="1.4"/>';
+    }
+    if (ymin <= 0 && ymax >= 0) {
+      const y0 = sy(0);
+      svg += '<line x1="' + PAD + '" y1="' + y0 + '" x2="' + (W - PAD) + '" y2="' + y0 + '" stroke="#4B5361" stroke-width="1.4"/>';
+    }
+    // curves
+    (pointsList || []).forEach((series) => {
+      let d = "";
+      let started = false;
+      series.points.forEach((p) => {
+        if (p.y === null || !Number.isFinite(p.y) || p.y < ymin - (ymax - ymin) * 3 || p.y > ymax + (ymax - ymin) * 3) {
+          started = false;
+          return;
+        }
+        const X = sx(p.x), Y = sy(p.y);
+        d += (started ? " L " : " M ") + X.toFixed(2) + " " + Y.toFixed(2);
+        started = true;
+      });
+      svg += '<path d="' + d + '" fill="none" stroke="' + (series.color || "#45D6C4") + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"' + (series.dashed ? ' stroke-dasharray="5,4"' : '') + '/>';
+    });
+    // markers
+    (opts.markers || []).forEach((m) => {
+      const X = sx(m.x), Y = sy(m.y);
+      svg += '<circle cx="' + X + '" cy="' + Y + '" r="4.5" fill="' + (m.color || "#F2B84B") + '" stroke="#0B0E14" stroke-width="1.5"/>';
+      if (m.label) {
+        svg += '<text x="' + (X + 7) + '" y="' + (Y - 7) + '" fill="' + (m.color || "#F2B84B") + '" font-size="11" font-family="ui-monospace,monospace">' + m.label + '</text>';
+      }
+    });
+    return '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg">' + svg + '</svg>';
+  }
+
+  function sampleFunction(expr, xmin, xmax, n) {
+    const pts = [];
+    const step = (xmax - xmin) / n;
+    for (let i = 0; i <= n; i++) {
+      const x = xmin + i * step;
+      let y = null;
+      try { y = evaluate(expr, "deg", { x: x }); if (!Number.isFinite(y)) y = null; } catch (e) { y = null; }
+      pts.push({ x: x, y: y });
+    }
+    return pts;
+  }
+
+  function niceBounds(points) {
+    const ys = points.map((p) => p.y).filter((y) => y !== null && Number.isFinite(y));
+    if (ys.length === 0) return { ymin: -10, ymax: 10 };
+    let ymin = Math.min(...ys), ymax = Math.max(...ys);
+    if (ymin === ymax) { ymin -= 1; ymax += 1; }
+    const pad = (ymax - ymin) * 0.12;
+    return { ymin: ymin - pad, ymax: ymax + pad };
+  }
+
+  // sub-tabs
+  document.querySelectorAll('#funcWrap .pill[data-fsub]').forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll('#funcWrap .pill[data-fsub]').forEach((t) => t.classList.toggle("active", t === tab));
+      const sub = tab.dataset.fsub;
+      document.getElementById("funcGeneric").classList.toggle("hidden", sub !== "generic");
+      document.getElementById("funcQuadratic").classList.toggle("hidden", sub !== "quadratic");
+    });
+  });
+
+  document.querySelectorAll("#funcGeneric .insert-chip").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const input = document.getElementById("fxInput");
+      input.value += btn.dataset.fxins;
+      input.focus();
+      updateFxEval();
+    });
+  });
+
+  function updateFxEval() {
+    const expr = document.getElementById("fxInput").value.trim();
+    const box = document.getElementById("fxEvalResult");
+    const xv = parseLocaleNumber(document.getElementById("fxEvalAt").value);
+    if (!expr) { box.classList.remove("err"); box.querySelector(".r-value").textContent = "—"; return; }
+    try {
+      const y = evaluate(expr, "deg", { x: xv });
+      box.classList.remove("err");
+      box.querySelector(".r-value").textContent = "f(" + fmt(xv, 4) + ") = " + fmt(y, 6);
+    } catch (e) {
+      box.classList.add("err");
+      box.querySelector(".r-value").textContent = "Erro na expressão";
+    }
+  }
+  document.getElementById("fxInput").addEventListener("input", updateFxEval);
+  document.getElementById("fxEvalAt").addEventListener("input", updateFxEval);
+
+  document.getElementById("fxPlotBtn").addEventListener("click", () => {
+    const expr = document.getElementById("fxInput").value.trim();
+    const xmin = parseLocaleNumber(document.getElementById("fxMin").value);
+    const xmax = parseLocaleNumber(document.getElementById("fxMax").value);
+    const step = parseLocaleNumber(document.getElementById("fxStep").value);
+    const graphWrap = document.getElementById("fxGraphWrap");
+    const tableWrap = document.getElementById("fxTableWrap");
+    if (!expr || !Number.isFinite(xmin) || !Number.isFinite(xmax) || xmin >= xmax) {
+      graphWrap.classList.add("hidden");
+      tableWrap.classList.add("hidden");
+      return;
+    }
+    const pts = sampleFunction(expr, xmin, xmax, 120);
+    const { ymin, ymax } = niceBounds(pts);
+    const svg = makeSvg([{ points: pts, color: "#45D6C4" }], { xmin, xmax, ymin, ymax, markers: [] });
+    graphWrap.innerHTML = svg;
+    graphWrap.classList.remove("hidden");
+
+    // tabela "estilo caderno": x | f(x) = substituição = resultado | (x, y)
+    const tbl = document.getElementById("fxTable");
+    if (!Number.isFinite(step) || step <= 0) {
+      tbl.innerHTML = "<tr><th>x</th><th>f(x)</th><th>(x, y)</th></tr><tr><td colspan='3'>passo inválido</td></tr>";
+      tableWrap.classList.remove("hidden");
+      return;
+    }
+    const maxRows = 60;
+    const rows = Math.min(maxRows, Math.floor((xmax - xmin) / step + 1e-9) + 1);
+    let html = "<tr><th>x</th><th>f(x)</th><th>(x, y)</th></tr>";
+    for (let i = 0; i < rows; i++) {
+      const x = xmin + i * step;
+      let y = null;
+      try { y = evaluate(expr, "deg", { x: x }); if (!Number.isFinite(y)) y = null; } catch (e) { y = null; }
+      const calc = "f(" + fmt(x, 4) + ") = " + substituteDisplay(expr, x) + (y !== null ? " = " + fmt(y, 4) : "");
+      html += "<tr><td>" + fmt(x, 4) + "</td><td class='calc'>" + calc + "</td><td>(" + fmt(x, 4) + ", " + (y === null ? "—" : fmt(y, 4)) + ")</td></tr>";
+    }
+    tbl.innerHTML = html;
+    tableWrap.classList.remove("hidden");
+  });
+
+  document.getElementById("qSolveBtn").addEventListener("click", () => {
+    const a = parseLocaleNumber(document.getElementById("qa").value);
+    const b = parseLocaleNumber(document.getElementById("qb").value);
+    const c = parseLocaleNumber(document.getElementById("qc").value);
+    const resultWrap = document.getElementById("qResultWrap");
+    const grid = document.getElementById("qResultGrid");
+    const graphWrap = document.getElementById("qGraphWrap");
+
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(c) || a === 0) {
+      grid.innerHTML = '<div class="s-row"><span>Erro</span><span>informe a, b, c (a ≠ 0)</span></div>';
+      resultWrap.classList.remove("hidden");
+      graphWrap.classList.add("hidden");
+      return;
+    }
+
+    const delta = b * b - 4 * a * c;
+    const xv = -b / (2 * a);
+    const yv = -delta / (4 * a);
+    let rootsHtml = "";
+    let markers = [{ x: xv, y: yv, label: "vértice", color: "#F2B84B" }];
+    if (delta > 0) {
+      const s = Math.sqrt(delta);
+      const x1 = (-b + s) / (2 * a), x2 = (-b - s) / (2 * a);
+      rootsHtml = "x' = " + fmt(x1, 4) + "  e  x'' = " + fmt(x2, 4);
+      markers.push({ x: x1, y: 0, label: "x'", color: "#45D6C4" });
+      markers.push({ x: x2, y: 0, label: "x''", color: "#45D6C4" });
+    } else if (delta === 0) {
+      const x0 = -b / (2 * a);
+      rootsHtml = "x = " + fmt(x0, 4) + " (raiz dupla)";
+      markers.push({ x: x0, y: 0, label: "x", color: "#45D6C4" });
+    } else {
+      const s = Math.sqrt(-delta) / (2 * a);
+      const re = -b / (2 * a);
+      rootsHtml = "x = " + fmt(re, 4) + " ± " + fmt(Math.abs(s), 4) + "i (raízes complexas)";
+    }
+
+    grid.innerHTML =
+      '<div class="s-row"><span>Δ (discriminante)</span><span>' + fmt(delta, 4) + '</span></div>' +
+      '<div class="s-row"><span>Raízes</span><span>' + rootsHtml + '</span></div>' +
+      '<div class="s-row"><span>Vértice (xv, yv)</span><span>(' + fmt(xv, 4) + ', ' + fmt(yv, 4) + ')</span></div>' +
+      '<div class="s-row"><span>Concavidade</span><span>' + (a > 0 ? "para cima (mínimo)" : "para baixo (máximo)") + '</span></div>' +
+      '<div class="s-row"><span>Eixo de simetria</span><span>x = ' + fmt(xv, 4) + '</span></div>';
+    resultWrap.classList.remove("hidden");
+
+    // graph domain centered on vertex/roots
+    let xmin = xv - 6, xmax = xv + 6;
+    if (delta > 0) {
+      const s = Math.sqrt(delta);
+      const x1 = (-b + s) / (2 * a), x2 = (-b - s) / (2 * a);
+      const span = Math.max(Math.abs(x1 - xv), Math.abs(x2 - xv)) * 1.6 + 1;
+      xmin = xv - span; xmax = xv + span;
+    }
+    const pts = [];
+    const n = 100;
+    for (let i = 0; i <= n; i++) {
+      const x = xmin + (i / n) * (xmax - xmin);
+      pts.push({ x: x, y: a * x * x + b * x + c });
+    }
+    const { ymin, ymax } = niceBounds(pts.concat(markers.map((m) => ({ y: m.y }))));
+    const svg = makeSvg([{ points: pts, color: "#45D6C4" }], { xmin, xmax, ymin, ymax, markers });
+    graphWrap.innerHTML = svg;
+    graphWrap.classList.remove("hidden");
+  });
+
+  /* ===========================================================
+     FÍSICA
+  =========================================================== */
+  const PHYS_CATS = [
+    ["cinematica", "Cinemática"], ["dinamica", "Dinâmica"], ["energia", "Energia"],
+    ["eletricidade", "Eletricidade"], ["termologia", "Termologia"], ["ondas", "Ondas"],
+  ];
+  const PHYSICS = [
+    { id:"mru-v", cat:"cinematica", name:"Velocidade média (MRU)", formula:"v = Δs / Δt",
+      vars:[{k:"ds",l:"Δs (deslocamento)",u:"m"},{k:"dt",l:"Δt (tempo)",u:"s"}],
+      compute:(v)=>v.ds/v.dt, outL:"Velocidade (v)", outU:"m/s" },
+    { id:"mru-s", cat:"cinematica", name:"Posição (MRU)", formula:"S = S₀ + v·t",
+      vars:[{k:"s0",l:"S₀ (posição inicial)",u:"m"},{k:"v",l:"v (velocidade)",u:"m/s"},{k:"t",l:"t (tempo)",u:"s"}],
+      compute:(v)=>v.s0+v.v*v.t, outL:"Posição (S)", outU:"m" },
+    { id:"mruv-v", cat:"cinematica", name:"Velocidade (MRUV)", formula:"v = v₀ + a·t",
+      vars:[{k:"v0",l:"v₀ (velocidade inicial)",u:"m/s"},{k:"a",l:"a (aceleração)",u:"m/s²"},{k:"t",l:"t (tempo)",u:"s"}],
+      compute:(v)=>v.v0+v.a*v.t, outL:"Velocidade (v)", outU:"m/s" },
+    { id:"mruv-s", cat:"cinematica", name:"Posição (MRUV)", formula:"S = S₀ + v₀t + at²/2",
+      vars:[{k:"s0",l:"S₀ (posição inicial)",u:"m"},{k:"v0",l:"v₀ (velocidade inicial)",u:"m/s"},{k:"a",l:"a (aceleração)",u:"m/s²"},{k:"t",l:"t (tempo)",u:"s"}],
+      compute:(v)=>v.s0+v.v0*v.t+(v.a*v.t*v.t)/2, outL:"Posição (S)", outU:"m" },
+    { id:"torricelli", cat:"cinematica", name:"Equação de Torricelli", formula:"v² = v₀² + 2·a·Δs",
+      vars:[{k:"v0",l:"v₀ (velocidade inicial)",u:"m/s"},{k:"a",l:"a (aceleração)",u:"m/s²"},{k:"ds",l:"Δs (deslocamento)",u:"m"}],
+      compute:(v)=>{ const val=v.v0*v.v0+2*v.a*v.ds; if(val<0) throw new Error("valor sob a raiz é negativo — confira os dados"); return Math.sqrt(val); }, outL:"Velocidade (v)", outU:"m/s" },
+    { id:"aceleracao", cat:"cinematica", name:"Aceleração média", formula:"a = Δv / Δt",
+      vars:[{k:"dv",l:"Δv (variação de velocidade)",u:"m/s"},{k:"dt",l:"Δt (tempo)",u:"s"}],
+      compute:(v)=>v.dv/v.dt, outL:"Aceleração (a)", outU:"m/s²" },
+
+    { id:"newton2", cat:"dinamica", name:"2ª Lei de Newton", formula:"F = m·a",
+      vars:[{k:"m",l:"m (massa)",u:"kg"},{k:"a",l:"a (aceleração)",u:"m/s²"}],
+      compute:(v)=>v.m*v.a, outL:"Força (F)", outU:"N" },
+    { id:"peso", cat:"dinamica", name:"Peso", formula:"P = m·g",
+      vars:[{k:"m",l:"m (massa)",u:"kg"},{k:"g",l:"g (gravidade)",u:"m/s²",def:10}],
+      compute:(v)=>v.m*v.g, outL:"Peso (P)", outU:"N" },
+    { id:"atrito", cat:"dinamica", name:"Força de atrito", formula:"Fat = μ·N",
+      vars:[{k:"mu",l:"μ (coef. de atrito)",u:""},{k:"n",l:"N (força normal)",u:"N"}],
+      compute:(v)=>v.mu*v.n, outL:"Força de atrito (Fat)", outU:"N" },
+    { id:"impulso", cat:"dinamica", name:"Impulso", formula:"I = F·Δt",
+      vars:[{k:"f",l:"F (força)",u:"N"},{k:"dt",l:"Δt (tempo)",u:"s"}],
+      compute:(v)=>v.f*v.dt, outL:"Impulso (I)", outU:"N·s" },
+    { id:"qtdmov", cat:"dinamica", name:"Quantidade de movimento", formula:"Q = m·v",
+      vars:[{k:"m",l:"m (massa)",u:"kg"},{k:"v",l:"v (velocidade)",u:"m/s"}],
+      compute:(v)=>v.m*v.v, outL:"Quantidade de movimento (Q)", outU:"kg·m/s" },
+    { id:"gravitacao", cat:"dinamica", name:"Gravitação Universal", formula:"F = G·m₁·m₂ / r²",
+      vars:[{k:"g",l:"G (constante gravitacional)",u:"N·m²/kg²",def:6.674e-11},{k:"m1",l:"m₁ (massa 1)",u:"kg"},{k:"m2",l:"m₂ (massa 2)",u:"kg"},{k:"r",l:"r (distância)",u:"m"}],
+      compute:(v)=>v.g*v.m1*v.m2/(v.r*v.r), outL:"Força (F)", outU:"N" },
+
+    { id:"trabalho", cat:"energia", name:"Trabalho", formula:"W = F·d·cos(θ)",
+      vars:[{k:"f",l:"F (força)",u:"N"},{k:"d",l:"d (deslocamento)",u:"m"},{k:"theta",l:"θ (ângulo)",u:"°",def:0}],
+      compute:(v)=>v.f*v.d*Math.cos(v.theta*Math.PI/180), outL:"Trabalho (W)", outU:"J" },
+    { id:"ec", cat:"energia", name:"Energia Cinética", formula:"Ec = m·v² / 2",
+      vars:[{k:"m",l:"m (massa)",u:"kg"},{k:"v",l:"v (velocidade)",u:"m/s"}],
+      compute:(v)=>(v.m*v.v*v.v)/2, outL:"Energia Cinética (Ec)", outU:"J" },
+    { id:"ep", cat:"energia", name:"Energia Potencial Gravitacional", formula:"Ep = m·g·h",
+      vars:[{k:"m",l:"m (massa)",u:"kg"},{k:"g",l:"g (gravidade)",u:"m/s²",def:10},{k:"h",l:"h (altura)",u:"m"}],
+      compute:(v)=>v.m*v.g*v.h, outL:"Energia Potencial (Ep)", outU:"J" },
+    { id:"eel", cat:"energia", name:"Energia Potencial Elástica", formula:"Eel = k·x² / 2",
+      vars:[{k:"k",l:"k (constante elástica)",u:"N/m"},{k:"x",l:"x (deformação)",u:"m"}],
+      compute:(v)=>(v.k*v.x*v.x)/2, outL:"Energia Elástica (Eel)", outU:"J" },
+    { id:"potencia-mec", cat:"energia", name:"Potência", formula:"Pot = W / Δt",
+      vars:[{k:"w",l:"W (trabalho)",u:"J"},{k:"dt",l:"Δt (tempo)",u:"s"}],
+      compute:(v)=>v.w/v.dt, outL:"Potência (Pot)", outU:"W" },
+    { id:"rendimento", cat:"energia", name:"Rendimento", formula:"η = (Pútil / Ptotal)·100",
+      vars:[{k:"pu",l:"Pútil (potência útil)",u:"W"},{k:"pt",l:"Ptotal (potência total)",u:"W"}],
+      compute:(v)=>(v.pu/v.pt)*100, outL:"Rendimento (η)", outU:"%" },
+
+    { id:"ohm", cat:"eletricidade", name:"Lei de Ohm", formula:"U = R·i",
+      vars:[{k:"r",l:"R (resistência)",u:"Ω"},{k:"i",l:"i (corrente)",u:"A"}],
+      compute:(v)=>v.r*v.i, outL:"Tensão (U)", outU:"V" },
+    { id:"pot-ui", cat:"eletricidade", name:"Potência Elétrica (U·i)", formula:"P = U·i",
+      vars:[{k:"u",l:"U (tensão)",u:"V"},{k:"i",l:"i (corrente)",u:"A"}],
+      compute:(v)=>v.u*v.i, outL:"Potência (P)", outU:"W" },
+    { id:"pot-ri2", cat:"eletricidade", name:"Potência Elétrica (R·i²)", formula:"P = R·i²",
+      vars:[{k:"r",l:"R (resistência)",u:"Ω"},{k:"i",l:"i (corrente)",u:"A"}],
+      compute:(v)=>v.r*v.i*v.i, outL:"Potência (P)", outU:"W" },
+    { id:"pot-u2r", cat:"eletricidade", name:"Potência Elétrica (U²/R)", formula:"P = U² / R",
+      vars:[{k:"u",l:"U (tensão)",u:"V"},{k:"r",l:"R (resistência)",u:"Ω"}],
+      compute:(v)=>(v.u*v.u)/v.r, outL:"Potência (P)", outU:"W" },
+    { id:"energia-eletrica", cat:"eletricidade", name:"Energia Elétrica", formula:"E = P·t",
+      vars:[{k:"p",l:"P (potência)",u:"W"},{k:"t",l:"t (tempo)",u:"s"}],
+      compute:(v)=>v.p*v.t, outL:"Energia (E)", outU:"J" },
+    { id:"res-serie", cat:"eletricidade", name:"Resistores em série", formula:"Req = R₁ + R₂",
+      vars:[{k:"r1",l:"R₁",u:"Ω"},{k:"r2",l:"R₂",u:"Ω"}],
+      compute:(v)=>v.r1+v.r2, outL:"Resistência equivalente (Req)", outU:"Ω" },
+    { id:"res-paralelo", cat:"eletricidade", name:"Resistores em paralelo", formula:"Req = (R₁·R₂)/(R₁+R₂)",
+      vars:[{k:"r1",l:"R₁",u:"Ω"},{k:"r2",l:"R₂",u:"Ω"}],
+      compute:(v)=>(v.r1*v.r2)/(v.r1+v.r2), outL:"Resistência equivalente (Req)", outU:"Ω" },
+
+    { id:"c-para-f", cat:"termologia", name:"Celsius → Fahrenheit", formula:"F = C·9/5 + 32",
+      vars:[{k:"c",l:"C (temperatura)",u:"°C"}],
+      compute:(v)=>v.c*9/5+32, outL:"Temperatura", outU:"°F" },
+    { id:"c-para-k", cat:"termologia", name:"Celsius → Kelvin", formula:"K = C + 273,15",
+      vars:[{k:"c",l:"C (temperatura)",u:"°C"}],
+      compute:(v)=>v.c+273.15, outL:"Temperatura", outU:"K" },
+    { id:"calor-sensivel", cat:"termologia", name:"Calor Sensível", formula:"Q = m·c·ΔT",
+      vars:[{k:"m",l:"m (massa)",u:"kg"},{k:"c",l:"c (calor específico)",u:"J/(kg·°C)"},{k:"dt",l:"ΔT (variação de temp.)",u:"°C"}],
+      compute:(v)=>v.m*v.c*v.dt, outL:"Calor (Q)", outU:"J" },
+    { id:"dilatacao", cat:"termologia", name:"Dilatação Linear", formula:"ΔL = L₀·α·ΔT",
+      vars:[{k:"l0",l:"L₀ (comprimento inicial)",u:"m"},{k:"alpha",l:"α (coef. de dilatação)",u:"°C⁻¹"},{k:"dt",l:"ΔT (variação de temp.)",u:"°C"}],
+      compute:(v)=>v.l0*v.alpha*v.dt, outL:"Dilatação (ΔL)", outU:"m" },
+    { id:"calor-latente", cat:"termologia", name:"Calor Latente", formula:"Q = m·L",
+      vars:[{k:"m",l:"m (massa)",u:"kg"},{k:"l",l:"L (calor latente)",u:"J/kg"}],
+      compute:(v)=>v.m*v.l, outL:"Calor (Q)", outU:"J" },
+    { id:"onda-v", cat:"ondas", name:"Velocidade de Onda", formula:"v = λ·f",
+      vars:[{k:"lambda",l:"λ (comprimento de onda)",u:"m"},{k:"f",l:"f (frequência)",u:"Hz"}],
+      compute:(v)=>v.lambda*v.f, outL:"Velocidade (v)", outU:"m/s" },
+    { id:"periodo", cat:"ondas", name:"Período", formula:"T = 1 / f",
+      vars:[{k:"f",l:"f (frequência)",u:"Hz"}],
+      compute:(v)=>1/v.f, outL:"Período (T)", outU:"s" },
+    { id:"frequencia", cat:"ondas", name:"Frequência", formula:"f = 1 / T",
+      vars:[{k:"t",l:"T (período)",u:"s"}],
+      compute:(v)=>1/v.t, outL:"Frequência (f)", outU:"Hz" },
+  ];
+
+  let physCat = "cinematica";
+  let physSelected = null;
+
+  function renderPhysCats() {
+    const wrap = document.getElementById("physCats");
+    wrap.innerHTML = "";
+    PHYS_CATS.forEach(([id, label]) => {
+      const b = document.createElement("button");
+      b.className = "pill" + (id === physCat ? " active" : "");
+      b.textContent = label;
+      b.addEventListener("click", () => { physCat = id; physSelected = null; renderPhysCats(); renderPhysFormulas(); document.getElementById("physFormPanel").classList.add("hidden"); });
+      wrap.appendChild(b);
+    });
+  }
+
+  function renderPhysFormulas() {
+    const wrap = document.getElementById("physFormulas");
+    wrap.innerHTML = "";
+    PHYSICS.filter((f) => f.cat === physCat).forEach((f) => {
+      const b = document.createElement("button");
+      b.className = "formula-btn" + (physSelected === f.id ? " active" : "");
+      b.innerHTML = '<span class="fname">' + f.name + '</span><span class="fformula">' + f.formula + '</span>';
+      b.addEventListener("click", () => { physSelected = f.id; renderPhysFormulas(); showPhysForm(f); });
+      wrap.appendChild(b);
+    });
+  }
+
+  function showPhysForm(f) {
+    document.getElementById("physFormPanel").classList.remove("hidden");
+    document.getElementById("physFormulaLabel").textContent = f.name + "  ·  " + f.formula;
+    const fieldsWrap = document.getElementById("physFields");
+    fieldsWrap.innerHTML = "";
+    f.vars.forEach((v) => {
+      const div = document.createElement("div");
+      div.className = "field";
+      div.innerHTML = '<label>' + v.l + (v.u ? ' <span class="unit-suffix">(' + v.u + ')</span>' : '') + '</label>' +
+        '<input type="number" data-pvar="' + v.k + '" value="' + (v.def !== undefined ? v.def : "") + '" placeholder="' + (v.def !== undefined ? v.def : "0") + '">';
+      fieldsWrap.appendChild(div);
+    });
+    document.getElementById("physResult").classList.add("hidden");
+
+    document.getElementById("physCalcBtn").onclick = () => {
+      const vals = {};
+      let ok = true;
+      fieldsWrap.querySelectorAll("[data-pvar]").forEach((inp) => {
+        const n = parseLocaleNumber(inp.value);
+        if (!Number.isFinite(n)) ok = false;
+        vals[inp.dataset.pvar] = n;
+      });
+      const box = document.getElementById("physResult");
+      box.classList.remove("hidden");
+      if (!ok) {
+        box.classList.add("err");
+        box.querySelector(".r-label").textContent = "";
+        box.querySelector(".r-value").textContent = "Preencha todos os campos";
+        return;
+      }
+      try {
+        const res = f.compute(vals);
+        box.classList.remove("err");
+        box.querySelector(".r-label").textContent = f.outL;
+        box.querySelector(".r-value").textContent = fmt(res, 6) + (f.outU ? " " + f.outU : "");
+      } catch (e) {
+        box.classList.add("err");
+        box.querySelector(".r-label").textContent = "";
+        box.querySelector(".r-value").textContent = e.message;
+      }
+    };
+  }
+
+  /* ===========================================================
+     CONVERSOR
+  =========================================================== */
+  const UNIT_CATS = [
+    { id:"comprimento", label:"Comprimento", units:{ mm:0.001, cm:0.01, m:1, km:1000, pol:0.0254, pe:0.3048, milha:1609.344 },
+      names:{ mm:"mm", cm:"cm", m:"m", km:"km", pol:"polegada", pe:"pé", milha:"milha" } },
+    { id:"massa", label:"Massa", units:{ mg:1e-6, g:0.001, kg:1, t:1000, lb:0.45359237 },
+      names:{ mg:"mg", g:"g", kg:"kg", t:"tonelada", lb:"libra" } },
+    { id:"volume", label:"Volume", units:{ ml:0.001, l:1, m3:1000, gal:3.785411784 },
+      names:{ ml:"ml", l:"litro", m3:"m³", gal:"galão (US)" } },
+    { id:"velocidade", label:"Velocidade", units:{ ms:1, kmh:1/3.6, mph:0.44704, no:0.514444 },
+      names:{ ms:"m/s", kmh:"km/h", mph:"mph", no:"nó" } },
+    { id:"tempo", label:"Tempo", units:{ s:1, min:60, h:3600, dia:86400 },
+      names:{ s:"segundo", min:"minuto", h:"hora", dia:"dia" } },
+    { id:"temperatura", label:"Temperatura", special:"temp",
+      units:{ C:1, F:1, K:1 }, names:{ C:"Celsius (°C)", F:"Fahrenheit (°F)", K:"Kelvin (K)" } },
+  ];
+
+  function tempToC(v, from) {
+    if (from === "C") return v;
+    if (from === "F") return (v - 32) * 5 / 9;
+    return v - 273.15;
+  }
+  function cToTemp(c, to) {
+    if (to === "C") return c;
+    if (to === "F") return c * 9 / 5 + 32;
+    return c + 273.15;
+  }
+
+  let convCat = "comprimento";
+
+  function renderConvCats() {
+    const wrap = document.getElementById("convCats");
+    wrap.innerHTML = "";
+    UNIT_CATS.forEach((c) => {
+      const b = document.createElement("button");
+      b.className = "pill" + (c.id === convCat ? " active" : "");
+      b.textContent = c.label;
+      b.addEventListener("click", () => { convCat = c.id; renderConvCats(); populateConvUnits(); doConvert(); });
+      wrap.appendChild(b);
+    });
+  }
+
+  function populateConvUnits() {
+    const cat = UNIT_CATS.find((c) => c.id === convCat);
+    const fromSel = document.getElementById("convFrom");
+    const toSel = document.getElementById("convTo");
+    fromSel.innerHTML = ""; toSel.innerHTML = "";
+    Object.keys(cat.units).forEach((u, idx) => {
+      const opt1 = document.createElement("option"); opt1.value = u; opt1.textContent = cat.names[u];
+      const opt2 = document.createElement("option"); opt2.value = u; opt2.textContent = cat.names[u];
+      fromSel.appendChild(opt1); toSel.appendChild(opt2);
+    });
+    const keys = Object.keys(cat.units);
+    fromSel.value = keys[0];
+    toSel.value = keys.length > 1 ? keys[1] : keys[0];
+  }
+
+  function doConvert() {
+    const cat = UNIT_CATS.find((c) => c.id === convCat);
+    const val = parseLocaleNumber(document.getElementById("convValue").value);
+    const from = document.getElementById("convFrom").value;
+    const to = document.getElementById("convTo").value;
+    const box = document.getElementById("convResult");
+    if (!Number.isFinite(val)) { box.querySelector(".r-value").textContent = "—"; return; }
+    let res;
+    if (cat.special === "temp") {
+      res = cToTemp(tempToC(val, from), to);
+    } else {
+      res = (val * cat.units[from]) / cat.units[to];
+    }
+    box.querySelector(".r-value").textContent = fmt(res, 6) + " " + cat.names[to];
+  }
+
+  document.getElementById("convValue").addEventListener("input", doConvert);
+  document.getElementById("convFrom").addEventListener("change", doConvert);
+  document.getElementById("convTo").addEventListener("change", doConvert);
+  document.getElementById("convSwap").addEventListener("click", () => {
+    const fromSel = document.getElementById("convFrom");
+    const toSel = document.getElementById("convTo");
+    const tmp = fromSel.value; fromSel.value = toSel.value; toSel.value = tmp;
+    doConvert();
+  });
+
+  /* ===========================================================
+     ESTATÍSTICA
+  =========================================================== */
+  let statData = [];
+
+  function renderStatChips() {
+    const wrap = document.getElementById("statChips");
+    wrap.innerHTML = "";
+    statData.forEach((n, idx) => {
+      const chip = document.createElement("span");
+      chip.className = "chip";
+      chip.innerHTML = fmt(n, 4) + ' <button data-idx="' + idx + '">×</button>';
+      chip.querySelector("button").addEventListener("click", () => { statData.splice(idx, 1); renderStatChips(); renderStats(); });
+      wrap.appendChild(chip);
+    });
+    document.getElementById("statClearBtn").classList.toggle("hidden", statData.length === 0);
+  }
+
+  function computeStats(arr) {
+    const n = arr.length;
+    const soma = arr.reduce((a, b) => a + b, 0);
+    const media = soma / n;
+    const sorted = [...arr].sort((a, b) => a - b);
+    const mediana = n % 2 === 0 ? (sorted[n / 2 - 1] + sorted[n / 2]) / 2 : sorted[(n - 1) / 2];
+    const freq = {};
+    arr.forEach((v) => { freq[v] = (freq[v] || 0) + 1; });
+    const maxFreq = Math.max(...Object.values(freq));
+    const modas = Object.keys(freq).filter((k) => freq[k] === maxFreq).map(Number);
+    const moda = maxFreq > 1 ? modas.map((m) => fmt(m, 4)).join(", ") : "nenhuma (amodal)";
+    const varPop = arr.reduce((a, b) => a + (b - media) ** 2, 0) / n;
+    const varAmo = n > 1 ? arr.reduce((a, b) => a + (b - media) ** 2, 0) / (n - 1) : NaN;
+    return {
+      n, soma, media, mediana, moda,
+      varPop, dpPop: Math.sqrt(varPop),
+      varAmo, dpAmo: Math.sqrt(varAmo),
+      min: sorted[0], max: sorted[n - 1], amplitude: sorted[n - 1] - sorted[0],
+    };
+  }
+
+  function renderStats() {
+    const wrap = document.getElementById("statResultWrap");
+    const grid = document.getElementById("statResultGrid");
+    if (statData.length === 0) { wrap.classList.add("hidden"); return; }
+    wrap.classList.remove("hidden");
+    const s = computeStats(statData);
+    let html = "";
+    html += '<div class="s-row"><span>n (quantidade)</span><span>' + s.n + '</span></div>';
+    html += '<div class="s-row"><span>Soma</span><span>' + fmt(s.soma, 4) + '</span></div>';
+    html += '<div class="s-row"><span>Média</span><span>' + fmt(s.media, 4) + '</span></div>';
+    html += '<div class="s-row"><span>Mediana</span><span>' + fmt(s.mediana, 4) + '</span></div>';
+    html += '<div class="s-row"><span>Moda</span><span>' + s.moda + '</span></div>';
+    html += '<div class="s-row"><span>Mínimo / Máximo</span><span>' + fmt(s.min, 4) + ' / ' + fmt(s.max, 4) + '</span></div>';
+    html += '<div class="s-row"><span>Amplitude</span><span>' + fmt(s.amplitude, 4) + '</span></div>';
+    html += '<div class="s-section">POPULACIONAL</div>';
+    html += '<div class="s-row"><span>Variância</span><span>' + fmt(s.varPop, 4) + '</span></div>';
+    html += '<div class="s-row"><span>Desvio padrão</span><span>' + fmt(s.dpPop, 4) + '</span></div>';
+    if (s.n > 1) {
+      html += '<div class="s-section">AMOSTRAL (n−1)</div>';
+      html += '<div class="s-row"><span>Variância</span><span>' + fmt(s.varAmo, 4) + '</span></div>';
+      html += '<div class="s-row"><span>Desvio padrão</span><span>' + fmt(s.dpAmo, 4) + '</span></div>';
+    }
+    grid.innerHTML = html;
+  }
+
+  function statAdd() {
+    const input = document.getElementById("statInput");
+    const n = parseLocaleNumber(input.value);
+    if (!Number.isFinite(n)) return;
+    statData.push(n);
+    input.value = "";
+    input.focus();
+    renderStatChips();
+    renderStats();
+  }
+  document.getElementById("statAddBtn").addEventListener("click", statAdd);
+  document.getElementById("statInput").addEventListener("keydown", (e) => { if (e.key === "Enter") statAdd(); });
+  document.getElementById("statClearBtn").addEventListener("click", () => { statData = []; renderStatChips(); renderStats(); });
+
+  /* ===========================================================
+     GEOMETRIA
+  =========================================================== */
+  const SHAPES = [
+    { id:"quadrado", name:"Quadrado", vars:[{k:"l",l:"Lado (l)",u:"m"}],
+      area:(v)=>v.l*v.l, areaF:"A = l²", perim:(v)=>4*v.l, perimF:"P = 4l" },
+    { id:"retangulo", name:"Retângulo", vars:[{k:"b",l:"Base (b)",u:"m"},{k:"h",l:"Altura (h)",u:"m"}],
+      area:(v)=>v.b*v.h, areaF:"A = b·h", perim:(v)=>2*(v.b+v.h), perimF:"P = 2(b+h)" },
+    { id:"triangulo", name:"Triângulo", vars:[{k:"b",l:"Base (b)",u:"m"},{k:"h",l:"Altura (h)",u:"m"}],
+      extraVars:[{k:"l1",l:"Lado 1",u:"m",optional:true},{k:"l2",l:"Lado 2",u:"m",optional:true},{k:"l3",l:"Lado 3",u:"m",optional:true}],
+      area:(v)=>(v.b*v.h)/2, areaF:"A = (b·h)/2",
+      perim:(v)=>(v.l1&&v.l2&&v.l3)?v.l1+v.l2+v.l3:null, perimF:"P = l₁+l₂+l₃ (lados opcionais)" },
+    { id:"circulo", name:"Círculo", vars:[{k:"r",l:"Raio (r)",u:"m"}],
+      area:(v)=>Math.PI*v.r*v.r, areaF:"A = π·r²", perim:(v)=>2*Math.PI*v.r, perimF:"C = 2·π·r" },
+    { id:"trapezio", name:"Trapézio", vars:[{k:"B",l:"Base maior (B)",u:"m"},{k:"b",l:"Base menor (b)",u:"m"},{k:"h",l:"Altura (h)",u:"m"}],
+      extraVars:[{k:"l1",l:"Lado 1",u:"m",optional:true},{k:"l2",l:"Lado 2",u:"m",optional:true}],
+      area:(v)=>((v.B+v.b)/2)*v.h, areaF:"A = ((B+b)/2)·h",
+      perim:(v)=>(v.l1&&v.l2)?v.B+v.b+v.l1+v.l2:null, perimF:"P = B+b+l₁+l₂ (lados opcionais)" },
+    { id:"paralelogramo", name:"Paralelogramo", vars:[{k:"b",l:"Base (b)",u:"m"},{k:"h",l:"Altura (h)",u:"m"}],
+      extraVars:[{k:"l",l:"Lado (l)",u:"m",optional:true}],
+      area:(v)=>v.b*v.h, areaF:"A = b·h", perim:(v)=>v.l?2*(v.b+v.l):null, perimF:"P = 2(b+l) (lado opcional)" },
+    { id:"losango", name:"Losango", vars:[{k:"D",l:"Diagonal maior (D)",u:"m"},{k:"d",l:"Diagonal menor (d)",u:"m"}],
+      area:(v)=>(v.D*v.d)/2, areaF:"A = (D·d)/2",
+      perim:(v)=>4*Math.sqrt((v.D/2)**2+(v.d/2)**2), perimF:"P = 4l  (l obtido pelas diagonais)" },
+  ];
+
+  let geoSelected = "quadrado";
+
+  function renderGeoShapes() {
+    const wrap = document.getElementById("geoShapes");
+    wrap.innerHTML = "";
+    SHAPES.forEach((s) => {
+      const b = document.createElement("button");
+      b.className = "pill" + (s.id === geoSelected ? " active" : "");
+      b.textContent = s.name;
+      b.addEventListener("click", () => { geoSelected = s.id; renderGeoShapes(); renderGeoFields(); document.getElementById("geoResultWrap").classList.add("hidden"); });
+      wrap.appendChild(b);
+    });
+  }
+
+  function renderGeoFields() {
+    const shape = SHAPES.find((s) => s.id === geoSelected);
+    const wrap = document.getElementById("geoFields");
+    wrap.innerHTML = "";
+    (shape.vars || []).forEach((v) => {
+      const div = document.createElement("div");
+      div.className = "field";
+      div.innerHTML = '<label>' + v.l + (v.u ? ' <span class="unit-suffix">(' + v.u + ')</span>' : '') + '</label>' +
+        '<input type="number" data-gvar="' + v.k + '" placeholder="0">';
+      wrap.appendChild(div);
+    });
+    if (shape.extraVars) {
+      const note = document.createElement("div");
+      note.className = "note";
+      note.textContent = "Campos opcionais abaixo, necessários apenas para calcular o perímetro:";
+      wrap.appendChild(note);
+      shape.extraVars.forEach((v) => {
+        const div = document.createElement("div");
+        div.className = "field";
+        div.innerHTML = '<label>' + v.l + (v.u ? ' <span class="unit-suffix">(' + v.u + ')</span>' : '') + '</label>' +
+          '<input type="number" data-gvar="' + v.k + '" placeholder="opcional">';
+        wrap.appendChild(div);
+      });
+    }
+  }
+
+  document.getElementById("geoCalcBtn").addEventListener("click", () => {
+    const shape = SHAPES.find((s) => s.id === geoSelected);
+    const vals = {};
+    let ok = true;
+    document.querySelectorAll("#geoFields [data-gvar]").forEach((inp) => {
+      const n = parseLocaleNumber(inp.value);
+      if (inp.value.trim() !== "" && Number.isFinite(n)) vals[inp.dataset.gvar] = n;
+    });
+    (shape.vars || []).forEach((v) => { if (!(v.k in vals)) ok = false; });
+
+    const wrap = document.getElementById("geoResultWrap");
+    const grid = document.getElementById("geoResultGrid");
+    wrap.classList.remove("hidden");
+    if (!ok) {
+      grid.innerHTML = '<div class="s-row"><span>Erro</span><span>preencha os campos obrigatórios</span></div>';
+      return;
+    }
+    const area = shape.area(vals);
+    let html = '<div class="s-row"><span>Área (' + shape.areaF + ')</span><span>' + fmt(area, 4) + ' m²</span></div>';
+    if (shape.perim) {
+      const p = shape.perim(vals);
+      html += '<div class="s-row"><span>Perímetro (' + shape.perimF + ')</span><span>' + (p === null || !Number.isFinite(p) ? "—" : fmt(p, 4) + " m") + '</span></div>';
+    }
+    grid.innerHTML = html;
+  });
+
+  /* ===========================================================
+     TROCA DE MODO
+  =========================================================== */
+  const modeLabel = document.getElementById("modeLabel");
+  const fnPad = document.getElementById("fnPad");
+  const basicPad = document.getElementById("basicPad");
+  const mainDisplay = document.getElementById("mainDisplay");
+  const historyWrap = document.getElementById("historyWrap");
+  const progWrap = document.getElementById("progWrap");
+  const funcWrap = document.getElementById("funcWrap");
+  const physWrap = document.getElementById("physWrap");
+  const convWrap = document.getElementById("convWrap");
+  const statsWrap = document.getElementById("statsWrap");
+  const geoWrap = document.getElementById("geoWrap");
+
+  const ALL_WRAPS = { mainDisplay, historyWrap, fnPad, basicPad, progWrap, funcWrap, physWrap, convWrap, statsWrap, geoWrap };
+  const MODE_NAMES = {
+    basic: "básica", scientific: "científica", programmer: "programador",
+    "function": "função", physics: "física", converter: "conversor", stats: "estatística", geometry: "geometria",
+  };
+  const MODE_VISIBLE = {
+    basic: ["mainDisplay", "historyWrap", "basicPad"],
+    scientific: ["mainDisplay", "historyWrap", "fnPad", "basicPad"],
+    programmer: ["progWrap"],
+    "function": ["funcWrap"],
+    physics: ["physWrap"],
+    converter: ["convWrap"],
+    stats: ["statsWrap"],
+    geometry: ["geoWrap"],
+  };
+
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("active", t === tab));
+      const mode = tab.dataset.mode;
+      modeLabel.textContent = MODE_NAMES[mode];
+
+      const visible = MODE_VISIBLE[mode];
+      Object.keys(ALL_WRAPS).forEach((key) => {
+        ALL_WRAPS[key].classList.toggle("hidden", !visible.includes(key));
+      });
+
+      angleBadge.style.opacity = mode === "scientific" ? "1" : "0";
+
+      if (mode === "programmer") renderProg();
+      if (mode === "basic" || mode === "scientific") { renderHistory(); renderCalc(); }
+      if (mode === "physics" && !document.getElementById("physCats").children.length) { renderPhysCats(); renderPhysFormulas(); }
+      if (mode === "converter" && !document.getElementById("convCats").children.length) { renderConvCats(); populateConvUnits(); doConvert(); }
+      if (mode === "geometry" && !document.getElementById("geoShapes").children.length) { renderGeoShapes(); renderGeoFields(); }
+    });
+  });
+
+  // initial paint
+  angleBadge.style.opacity = "0";
+  renderCalc();
+})();
+</script>
+</body>
+</html>
