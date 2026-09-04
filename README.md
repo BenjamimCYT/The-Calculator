@@ -17,12 +17,6 @@ Calculadora web completa em um **único arquivo HTML** — sem instalação, sem
 
 Baixe o repositório e abra o `index.html` em qualquer navegador. Não precisa de servidor, internet ou instalação de nada.
 
-### Hospedar com GitHub Pages (opcional, pra acessar de qualquer lugar)
-
-1. No repositório, vá em **Settings → Pages**
-2. Em "Source", selecione a branch `main` e a pasta `/root` (raiz)
-3. Salve — em alguns minutos o app fica disponível em `https://SEU-USUARIO.github.io/NOME-DO-REPO/`
-
 ## 🛠️ Tecnologia
 
 HTML, CSS e JavaScript puro — sem frameworks, sem dependências externas, sem etapa de build. Todo o parser de expressões matemáticas e a lógica de cada modo foram escritos do zero.
